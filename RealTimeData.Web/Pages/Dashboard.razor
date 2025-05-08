@@ -1,0 +1,223 @@
+﻿@page "/"
+@using RealTimeData.Web.Models
+@using System.Collections.Concurrent
+@inject DataService DataService
+@implements IAsyncDisposable
+
+<PageTitle>Real-Time Data Dashboard</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge">
+	<MudText Typo="Typo.h3" Class="mb-4">Real-Time Data Dashboard</MudText>
+
+	<MudPaper Elevation="3" Class="pa-4 mb-4">
+		<MudGrid>
+			<MudItem xs="12">
+				<MudText Typo="Typo.h5" Class="mb-4">Live Data Chart</MudText>
+				@if (_isLoading)
+				{
+					<MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+				}
+				<div class="chart-container">
+					<MudChart ChartType="ChartType.Line"
+							  ChartSeries="@_series"
+							  XAxisLabels="@_xAxisLabels.ToArray()"
+							  Width="100%" Height="350px" CanHideSeries="true">
+						<CustomGraphics>
+							<MudText Typo="Typo.body1" Align="Align.Center">Data points over time</MudText>
+						</CustomGraphics>
+					</MudChart>
+				</div>
+			</MudItem>
+		</MudGrid>
+	</MudPaper>
+
+	<MudGrid>
+		<MudItem xs="12" md="4">
+			<MudPaper Elevation="3" Class="pa-4">
+				<MudText Typo="Typo.h6" Class="mb-2">x</MudText>
+				<MudText Typo="Typo.h3" Color="Color.Primary">@(_temperatureValue.ToString("F1"))</MudText>
+			</MudPaper>
+		</MudItem>
+		<MudItem xs="12" md="4">
+			<MudPaper Elevation="3" Class="pa-4">
+				<MudText Typo="Typo.h6" Class="mb-2">y</MudText>
+				<MudText Typo="Typo.h3" Color="Color.Secondary">@(_humidityValue.ToString("F1"))</MudText>
+			</MudPaper>
+		</MudItem>
+		<MudItem xs="12" md="4">
+			<MudPaper Elevation="3" Class="pa-4">
+				<MudText Typo="Typo.h6" Class="mb-2">z</MudText>
+				<MudText Typo="Typo.h3" Color="Color.Error">@(_pressureValue.ToString("F1"))</MudText>
+			</MudPaper>
+		</MudItem>
+	</MudGrid>
+
+	<MudPaper Elevation="3" Class="pa-4 mt-4">
+		<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="GenerateRandomDataPoint">
+			Generate Random Data Point (Test)
+		</MudButton>
+	</MudPaper>
+</MudContainer>
+
+@code {
+	private bool _isLoading = true;
+	private readonly ConcurrentDictionary<string, List<decimal>> _categoryData = new();
+	private readonly List<string> _xAxisLabels = new();
+	private List<ChartSeries> _series = new();
+
+
+	private decimal _temperatureValue = 0;
+	private decimal _humidityValue = 0;
+	private decimal _pressureValue = 0;
+	private DateTime _temperatureTimestamp = DateTime.Now;
+	private DateTime _humidityTimestamp = DateTime.Now;
+	private DateTime _pressureTimestamp = DateTime.Now;
+
+
+	private const int MaxDataPoints = 20;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await DataService.InitializeSignalRConnection();
+		DataService.OnDataPointReceived += HandleDataPointReceived;
+
+
+		await LoadInitialData();
+
+		_isLoading = false;
+	}
+
+	private async Task LoadInitialData()
+	{
+		try
+		{
+			var dataPoints = await DataService.GetLatestDataPointsAsync(MaxDataPoints);
+
+			_categoryData["Temperature"] = new List<decimal>();
+			_categoryData["Humidity"] = new List<decimal>();
+			_categoryData["Pressure"] = new List<decimal>();
+
+			foreach (var dataPoint in dataPoints)
+			{
+				AddDataPointToSeries(dataPoint);
+			}
+
+			UpdateChartSeries();
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Error loading initial data: {ex.Message}");
+		}
+	}
+
+	private void HandleDataPointReceived(DataPoint dataPoint)
+	{
+		Console.WriteLine("🔥 GELEN VERİ:");
+		Console.WriteLine($"  Category: {dataPoint.Category}");
+		Console.WriteLine($"  Value   : {dataPoint.Value}");
+		Console.WriteLine($"  Time    : {dataPoint.Timestamp:yyyy-MM-dd HH:mm:ss.fff}");
+
+		InvokeAsync(() =>
+		{
+			AddDataPointToSeries(dataPoint);
+			UpdateLatestValues(dataPoint);
+			UpdateChartSeries();
+			StateHasChanged();
+		});
+	}
+
+
+
+	private void AddDataPointToSeries(DataPoint dataPoint)
+	{
+		if (!_categoryData.ContainsKey(dataPoint.Category))
+		{
+			_categoryData[dataPoint.Category] = new List<decimal>();
+		}
+
+		string timeLabel = dataPoint.Timestamp.ToString("HH:mm:ss.fff");
+		_xAxisLabels.Add(timeLabel);
+		if (_xAxisLabels.Count > MaxDataPoints)
+		{
+			_xAxisLabels.RemoveAt(0);
+		}
+
+		foreach (var category in _categoryData.Keys)
+		{
+			if (category == dataPoint.Category)
+				_categoryData[category].Add(dataPoint.Value);
+			else
+				_categoryData[category].Add(0);
+
+			if (_categoryData[category].Count > MaxDataPoints)
+				_categoryData[category].RemoveAt(0);
+		}
+	}
+
+
+	private void UpdateChartSeries()
+	{
+		var newSeries = new List<ChartSeries>();
+
+		if (_categoryData.ContainsKey("Temperature"))
+		{
+			newSeries.Add(new ChartSeries
+				{
+					Name = "x",
+					Data = _categoryData["Temperature"].Select(x => (double)x).ToArray()
+				});
+		}
+
+		if (_categoryData.ContainsKey("Humidity"))
+		{
+			newSeries.Add(new ChartSeries
+				{
+					Name = "y",
+					Data = _categoryData["Humidity"].Select(x => (double)x).ToArray()
+				});
+		}
+
+		if (_categoryData.ContainsKey("Pressure"))
+		{
+			newSeries.Add(new ChartSeries
+				{
+					Name = "z",
+					Data = _categoryData["Pressure"].Select(x => (double)(x / 10)).ToArray()
+				});
+		}
+
+		_series = newSeries;
+		StateHasChanged();
+	}
+
+
+	private void UpdateLatestValues(DataPoint dataPoint)
+	{
+		switch (dataPoint.Category)
+		{
+			case "Temperature":
+				_temperatureValue = dataPoint.Value;
+				_temperatureTimestamp = dataPoint.Timestamp;
+				break;
+			case "Humidity":
+				_humidityValue = dataPoint.Value;
+				_humidityTimestamp = dataPoint.Timestamp;
+				break;
+			case "Pressure":
+				_pressureValue = dataPoint.Value;
+				_pressureTimestamp = dataPoint.Timestamp;
+				break;
+		}
+	}
+
+	private async Task GenerateRandomDataPoint()
+	{
+		await DataService.GenerateRandomDataPointAsync();
+	}
+
+	public async ValueTask DisposeAsync()
+	{
+		DataService.OnDataPointReceived -= HandleDataPointReceived;
+		await DataService.DisposeAsync();
+	}
+}

@@ -1,0 +1,26 @@
+﻿@page "/about"
+
+<PageTitle>About</PageTitle>
+
+<MudContainer>
+    <MudText Typo="Typo.h3" Class="mb-4">About This Application</MudText>
+
+    <MudPaper Elevation="3" Class="pa-4">
+        <MudText Typo="Typo.body1">
+            This is a real-time data visualization application built with:
+        </MudText>
+
+        <MudList T="string">
+            <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle">C# ASP.NET Core backend</MudListItem>
+            <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle">Blazor WebAssembly frontend</MudListItem>
+            <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle">PostgreSQL database with LISTEN/NOTIFY</MudListItem>
+            <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle">SignalR for real-time communication</MudListItem>
+            <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle">MudBlazor component library</MudListItem>
+        </MudList>
+
+        <MudText Typo="Typo.body1" Class="mt-4">
+            The application demonstrates real-time data visualization using PostgreSQL's LISTEN/NOTIFY mechanism to detect new data
+            as soon as it's inserted by external processes.
+        </MudText>
+    </MudPaper>
+</MudContainer>

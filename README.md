@@ -101,12 +101,6 @@ RealTimeDataWithBlazor/
 
 ---
 
-## 📸 Screenshot
-
-> Real-time dashboard view with chart and summary cards.  
-> *(You can insert an image here)*
-
----
 
 ## 📄 License
 
